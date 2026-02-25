@@ -11,7 +11,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: starter
-    healthCheckPath: /
+    healthCheckPath: /up
     disk:
       name: spree-storage
       mountPath: /rails/storage
