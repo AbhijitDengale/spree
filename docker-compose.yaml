@@ -1,20 +1,73 @@
 services:
+  # ── Database ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+      POSTGRES_DB: spree_production
     volumes:
-      - 'postgres:/var/lib/postgresql/data'
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
-      - 'redis:/data'
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Spree Web App ─────────────────────────────────────────────────────────
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres/spree_production
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/1
+      RAILS_ENV: production
+      RAILS_SERVE_STATIC_FILES: "true"
+      RAILS_LOG_TO_STDOUT: "true"
+      SECRET_KEY_BASE: "changeme_replace_with_real_secret_in_production"
+      WEB_CONCURRENCY: "1"
+    # NOTE: Fill in your payment keys below before running
+    # STRIPE_API_KEY: sk_live_xxxx
+    # STRIPE_PUBLISHABLE_KEY: pk_live_xxxx
+
+  # ── Sidekiq Background Worker ─────────────────────────────────────────────
+  worker:
+    build: .
+    command: bundle exec sidekiq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres/spree_production
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/1
+      RAILS_ENV: production
+      SECRET_KEY_BASE: "changeme_replace_with_real_secret_in_production"
 
 volumes:
-  postgres:
-  redis:
+  postgres_data:
+  redis_data:

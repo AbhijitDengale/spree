@@ -1,44 +1,17 @@
-envVarGroups:
-  - name: spree-envs
-    envVars:
-      - key: DB_POOL
-        value: 10
-
 databases:
   - name: spree-db
     databaseName: spree
     user: spree
-    plan: basic-1gb
-    diskSizeGB: 10
+    plan: starter
 
 services:
+  # ── Main Spree Web App (Docker) ──────────────────────────────────────────
   - type: web
     name: spree-web
-    runtime: ruby
-    plan: standard
-    buildCommand: bin/render-build.sh
-    preDeployCommand: bin/rails db:migrate && bin/rails db:seed
-    startCommand: "bundle exec puma -C config/puma.rb"
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: spree-db
-          property: connectionString
-      - key: SECRET_KEY_BASE
-        sync: false
-      - key: WEB_CONCURRENCY
-        value: 2 # sensible default
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: keyvalue
-          property: connectionString
-  - type: worker
-    name: spree-worker
-    runtime: ruby
-    plan: standard
-    buildCommand: bin/render-build.sh
-    startCommand: bundle exec sidekiq
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -47,25 +20,68 @@ services:
       - key: REDIS_URL
         fromService:
           type: keyvalue
-          name: keyvalue
+          name: spree-redis
           property: connectionString
-      - key: SECRET_KEY_BASE
-        sync: false
       - key: REDIS_CACHE_URL
         fromService:
           type: keyvalue
-          name: keyvalue-cache
+          name: spree-redis-cache
           property: connectionString
-      - fromGroup: spree-envs
-  
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_ENV
+        value: production
+      - key: RAILS_SERVE_STATIC_FILES
+        value: "true"
+      - key: RAILS_LOG_TO_STDOUT
+        value: "true"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DB_POOL
+        value: "10"
+      # ── Payment Keys (fill in your own values) ──
+      # - key: STRIPE_API_KEY
+      #   value: sk_live_xxxx
+      # - key: STRIPE_PUBLISHABLE_KEY
+      #   value: pk_live_xxxx
+
+  # ── Sidekiq Background Worker (Docker) ───────────────────────────────────
+  - type: worker
+    name: spree-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    dockerCommand: bundle exec sidekiq
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spree-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: spree-redis
+          property: connectionString
+      - key: REDIS_CACHE_URL
+        fromService:
+          type: keyvalue
+          name: spree-redis-cache
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_ENV
+        value: production
+
+  # ── Redis (Jobs) ──────────────────────────────────────────────────────────
   - type: keyvalue
-    name: keyvalue
+    name: spree-redis
     ipAllowList: []
     plan: starter
     maxmemoryPolicy: noeviction
 
+  # ── Redis (Cache) ─────────────────────────────────────────────────────────
   - type: keyvalue
-    name: keyvalue-cache
+    name: spree-redis-cache
     ipAllowList: []
     plan: starter
     maxmemoryPolicy: allkeys-lru
