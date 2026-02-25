@@ -25,7 +25,7 @@ services:
       - key: REDIS_CACHE_URL
         fromService:
           type: keyvalue
-          name: spree-redis-cache
+          name: spree-redis
           property: connectionString
       - key: SECRET_KEY_BASE
         generateValue: true
@@ -39,7 +39,7 @@ services:
         value: "2"
       - key: DB_POOL
         value: "10"
-      # ── Payment Keys (fill in your own values) ──
+      # ── Payment Keys: add your own in Render dashboard ──
       # - key: STRIPE_API_KEY
       #   value: sk_live_xxxx
       # - key: STRIPE_PUBLISHABLE_KEY
@@ -62,26 +62,14 @@ services:
           type: keyvalue
           name: spree-redis
           property: connectionString
-      - key: REDIS_CACHE_URL
-        fromService:
-          type: keyvalue
-          name: spree-redis-cache
-          property: connectionString
       - key: SECRET_KEY_BASE
         generateValue: true
       - key: RAILS_ENV
         value: production
 
-  # ── Redis (Jobs) ──────────────────────────────────────────────────────────
+  # ── Single Redis (shared for jobs + cache) ───────────────────────────────
   - type: keyvalue
     name: spree-redis
     ipAllowList: []
     plan: starter
     maxmemoryPolicy: noeviction
-
-  # ── Redis (Cache) ─────────────────────────────────────────────────────────
-  - type: keyvalue
-    name: spree-redis-cache
-    ipAllowList: []
-    plan: starter
-    maxmemoryPolicy: allkeys-lru
